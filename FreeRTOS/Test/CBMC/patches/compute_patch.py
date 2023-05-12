@@ -81,8 +81,7 @@ def find_all_defines():
                    'macro' is expected to be matched.
                 """
                 for define in makefile[key]:
-                    matched = DEFINE_REGEX_MAKEFILE.match(define)
-                    if matched:
+                    if matched := DEFINE_REGEX_MAKEFILE.match(define):
                         defines.add(matched.group(1))
     return defines
 
@@ -140,10 +139,10 @@ def header_dirty(header_files):
                 stderr: {}
                 """.format(diff_state.returncode, diff_state.stderr)))
 
-    for header_file in header_files:
-        if os.path.basename(header_file) + "\n" in diff_state.stdout:
-            return True
-    return False
+    return any(
+        os.path.basename(header_file) + "\n" in diff_state.stdout
+        for header_file in header_files
+    )
 
 
 def create_patch(defines, header_file):
@@ -170,7 +169,7 @@ def create_patch(defines, header_file):
                 """.format(cleaned.returncode, header_file, cleaned.stderr)))
 
     header_path_part = header_file.replace(os.sep, "_")
-    path_name = "auto_patch_" + header_path_part + ".patch"
+    path_name = f"auto_patch_{header_path_part}.patch"
     path_name = os.path.join(PATCHES_DIR, path_name)
     if patch.stdout:
         with open(path_name, "w") as patch_file:
@@ -180,14 +179,13 @@ def create_patch(defines, header_file):
 def create_patches(headers):
     defines = find_all_defines()
 
-    if not header_dirty(headers):
-        for header in headers:
-            create_patch(defines, header)
-    else:
+    if header_dirty(headers):
         raise DirtyGitError(textwrap.dedent("""\
                 It seems like one of the header files is in dirty state.
                 This script cannot patch files in dirty state.
                 """))
+    for header in headers:
+        create_patch(defines, header)
 
 # Invoke 'python3 -m unittest compute_patch.py" for running tests.
 class TestDefineRegexes(unittest.TestCase):

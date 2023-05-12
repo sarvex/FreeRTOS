@@ -63,7 +63,7 @@ class Extractor(object):
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
-        print("Usage: %s <tagfile> <funcname>" % sys.argv[0])
+        print(f"Usage: {sys.argv[0]} <tagfile> <funcname>")
         sys.exit(1)
     tag_filename = sys.argv[1]
     funcname = sys.argv[2]

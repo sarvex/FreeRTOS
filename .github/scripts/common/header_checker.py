@@ -36,7 +36,7 @@ from colorama import Fore, Style
 
 
 def dprint(msg):
-    print("[DEBUG]: %s" % str(msg))
+    print(f"[DEBUG]: {str(msg)}")
 
 
 class HeaderChecker:
@@ -44,10 +44,7 @@ class HeaderChecker:
         """
         Separate header into text, copyright, and spdx sections.
         """
-        cur_headers = dict()
-        cur_headers["text"] = []
-        cur_headers["copyright"] = []
-        cur_headers["spdx"] = []
+        cur_headers = {"text": [], "copyright": [], "spdx": []}
         for line in header:
             if "Copyright" in line:
                 cur_headers["copyright"].append(line)
@@ -72,16 +69,12 @@ class HeaderChecker:
         self.padding = padding
         self.header = header
 
-        if copyright_regex:
-            self.copyright_regex = re.compile(copyright_regex)
-        else:
-            self.copyright_regex = None
-
+        self.copyright_regex = re.compile(copyright_regex) if copyright_regex else None
         # Construct mutated header for assembly files
-        self.asm_header = [";" + line for line in header]
+        self.asm_header = [f";{line}" for line in header]
 
         # Construct mutated header for python files
-        self.py_header = ["#" + line for line in header]
+        self.py_header = [f"#{line}" for line in header]
 
         self.headers = self.separateHeaderIntoSections(self.header)
         self.headers_asm = self.separateHeaderIntoSections(self.asm_header)
@@ -89,9 +82,7 @@ class HeaderChecker:
 
         self.ignorePatternList = []
         if ignored_patterns:
-            for p in ignored_patterns:
-                self.ignorePatternList.append(re.compile(p))
-
+            self.ignorePatternList.extend(re.compile(p) for p in ignored_patterns)
         self.ignoreFileList = ignored_files.copy() if ignored_files else []
         self.ignoreExtList = ignored_ext.copy() if ignored_ext else []
         self.pyExtList = py_ext.copy() if py_ext else []
@@ -99,9 +90,7 @@ class HeaderChecker:
 
         self.thirdPartyPatternList = []
         if third_party_patterns:
-            for p in third_party_patterns:
-                self.thirdPartyPatternList.append(re.compile(p))
-
+            self.thirdPartyPatternList.extend(re.compile(p) for p in third_party_patterns)
         self.spdx_data = None
         self.sdpx_regex = None
 
@@ -109,7 +98,7 @@ class HeaderChecker:
         """
         This is particularly useful when ingesting output from other programs, like git actions
         """
-        assert os.path.exists(path_json), "No such file: " + path_json
+        assert os.path.exists(path_json), f"No such file: {path_json}"
 
         # Get list of files to check from JSON file
         with open(path_json) as file_json:
@@ -121,7 +110,7 @@ class HeaderChecker:
         # Accrue how how files fail the check
         n_failed = 0
         for path_file in file_checklist:
-            assert isinstance(path_file, str), "Unexpected JSON format for " + path_json
+            assert isinstance(path_file, str), f"Unexpected JSON format for {path_json}"
             if os.path.exists(path_file) and not self.isValidFile(path_file):
                 n_failed += 1
 
@@ -148,7 +137,7 @@ class HeaderChecker:
     def getHeaderDiff(self, file_ext, header):
         diff = []
         if file_ext in self.pyExtList:
-            diff = list(unified_diff(header[: len(self.py_header)], self.py_header))
+            return list(unified_diff(header[: len(self.py_header)], self.py_header))
         elif file_ext in self.asmExtList:
             # For assembly files and headers, calculate diffs between both header types.
             # Return the smallest diff.
@@ -156,20 +145,15 @@ class HeaderChecker:
             diff_asm = list(
                 unified_diff(header[: len(self.asm_header)], self.asm_header)
             )
-            if len(diff_asm) >= len(diff_default):
-                diff = diff_default
-            else:
-                diff = diff_asm
+            return diff_default if len(diff_asm) >= len(diff_default) else diff_asm
         else:
-            diff = list(unified_diff(header[: len(self.header)], self.header))
-
-        return diff
+            return list(unified_diff(header[: len(self.header)], self.header))
 
     def isValidFile(self, path):
-        assert os.path.exists(path), "No such file: " + path
+        assert os.path.exists(path), f"No such file: {path}"
         print("-" * 85)
 
-        print("Checking file: %s..." % path, end="")
+        print(f"Checking file: {path}...", end="")
 
         file_ext = os.path.splitext(path)[-1]
 
@@ -205,7 +189,6 @@ class HeaderChecker:
                 print("PASS")
                 print("-" * 85)
                 return True
-            # Third party files may have a different copyright
             elif self.isThirdPartyFile(path) and text_equal and spdx_equal:
                 print("PASS")
                 print("-" * 85)
@@ -222,7 +205,7 @@ class HeaderChecker:
                 return False
             else:
                 print("FAIL")
-                print("File Delta: %s" % path)
+                print(f"File Delta: {path}")
                 print(*self.getHeaderDiff(file_ext, lines))
                 print("-" * 85)
                 return False
@@ -251,7 +234,7 @@ class HeaderChecker:
         """
         There are multiple ways a file can be ignored. This is a catch all
         """
-        assert os.path.exists(path), "No such file: " + path
+        assert os.path.exists(path), f"No such file: {path}"
 
         # Try simpler checks first
         filename = os.path.split(path)[-1]
@@ -259,22 +242,10 @@ class HeaderChecker:
         if extension in self.ignoreExtList or filename in self.ignoreFileList:
             return True
 
-        # Then iterate against regex patterns. In future consider Trie
-        for pattern in self.ignorePatternList:
-            # print(pattern)
-            if pattern.match(path):
-                return True
-
-        # print("DEBUG: did not match any regex")
-
-        return False
+        return any(pattern.match(path) for pattern in self.ignorePatternList)
 
     def isThirdPartyFile(self, path):
-        # Tterate against regex patterns
-        for pattern in self.thirdPartyPatternList:
-            if pattern.match(path):
-                return True
-        return False
+        return any(pattern.match(path) for pattern in self.thirdPartyPatternList)
 
     def showHelp(self, path_config):
         print(Fore.YELLOW)
@@ -327,39 +298,33 @@ class HeaderChecker:
         return parser
 
     def processArgs(self, args):
-        n_failed = 0
-        if args.json:
-            for path in args.files_checked:
-                n_failed += self.checkJSONList(path)
-        else:
-            for path in args.files_checked:
-                n_failed += not self.isValidFile(path)
-
-        return n_failed
+        return sum(
+            self.checkJSONList(path) if args.json else not self.isValidFile(path)
+            for path in args.files_checked
+        )
 
     def loadSpdxData(self):
         """Load spdx license and license exception information from github."""
-        spdx_data = dict()
         spdx_url = "https://raw.githubusercontent.com/spdx/license-list-data/"
 
-        licenses_url = spdx_url + "master/json/licenses.json"
+        licenses_url = f"{spdx_url}master/json/licenses.json"
         licenses = requests.get(licenses_url).json()
 
         assert "licenses" in licenses
-        spdx_data["licenses"] = dict()
-
-        for license in licenses["licenses"]:
-            spdx_data["licenses"][license["licenseId"]] = True
-
-        exceptions_url = spdx_url + "master/json/exceptions.json"
+        spdx_data = {
+            "licenses": {
+                license["licenseId"]: True for license in licenses["licenses"]
+            }
+        }
+        exceptions_url = f"{spdx_url}master/json/exceptions.json"
         exceptions = requests.get(exceptions_url).json()
 
         assert "exceptions" in exceptions
 
-        spdx_data["exceptions"] = dict()
-
-        for exception in exceptions["exceptions"]:
-            spdx_data["exceptions"][exception["licenseExceptionId"]] = True
+        spdx_data["exceptions"] = {
+            exception["licenseExceptionId"]: True
+            for exception in exceptions["exceptions"]
+        }
         self.spdx_data = spdx_data
 
     def validateSpdxTag(self, tag):
@@ -378,29 +343,19 @@ class HeaderChecker:
             # skip "and" "or" keywords
             if licenses[i] in ["and", "AND", "or", "OR"]:
                 pass
-            # "with" keyword denotes a license exception
             elif licenses[i] in ["with", "WITH"]:
                 # Set flag for next iteration
                 license_exception_flag = True
             elif license_exception_flag:
-                if not licenses[i].strip("()") in self.spdx_data["exceptions"]:
-                    dprint(
-                        "Invalid license exception id {} in SPDX tag {}".format(
-                            licenses[i], tag
-                        )
-                    )
+                if licenses[i].strip("()") not in self.spdx_data["exceptions"]:
+                    dprint(f"Invalid license exception id {licenses[i]} in SPDX tag {tag}")
                     error_count += 1
                 # No '(' character -> single license exception
                 if paren_depth <= last_paren_depth:
                     license_exception_flag = False
-            else:
-                if not licenses[i].strip("()") in self.spdx_data["licenses"]:
-                    dprint(
-                        'Invalid license id "{}" in SPDX tag "{}"'.format(
-                            licenses[i], tag
-                        )
-                    )
-                    error_count += 1
+            elif licenses[i].strip("()") not in self.spdx_data["licenses"]:
+                dprint(f'Invalid license id "{licenses[i]}" in SPDX tag "{tag}"')
+                error_count += 1
 
             last_paren_depth = paren_depth
             if licenses[i][-1] == ")":

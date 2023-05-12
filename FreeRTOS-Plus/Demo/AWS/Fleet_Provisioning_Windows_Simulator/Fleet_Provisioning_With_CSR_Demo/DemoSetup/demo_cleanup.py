@@ -141,22 +141,18 @@ def reset_files():
     if os.path.exists(f"{THING_CERT_NAME}"):
         os.remove(f"{THING_CERT_NAME}")
 
-    # Reset demo_config.h
-    template_file = open(f"{script_file_dir_abs_path}/demo_config_empty.templ", 'r')
-    file_text = template_file.read()
+    with open(f"{script_file_dir_abs_path}/demo_config_empty.templ", 'r') as template_file:
+        file_text = template_file.read()
 
-    header_file = open(f"{script_file_dir_abs_path}/../demo_config.h", "w")
-    header_file.write(file_text)
-    header_file.close()
-    template_file.close()
+        with open(f"{script_file_dir_abs_path}/../demo_config.h", "w") as header_file:
+            header_file.write(file_text)
     print("Credentials removed and demo_config.h reset.")
 
 # Get arguments
 def get_args():
     parser = argparse.ArgumentParser(description="Fleet Provisioning Demo setup script.")
     parser.add_argument("--force", action="store_true", help="Used to skip the user prompt before executing.")
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 # Parse arguments and execute appropriate functions
 def main():

@@ -33,15 +33,15 @@ _FREERTOS_COMPONENTS = [
 _FREERTOS_VERSION_MACRO_FILE = os.path.join('FreeRTOS', 'Source', 'include', 'task.h')
 
 def ask_question(question):
-    answer = input('{}: '.format(question))
+    answer = input(f'{question}: ')
     return answer.strip()
 
 
 def ask_multiple_choice_question(question, choices):
     while True:
-        print('{}?'.format(question))
+        print(f'{question}?')
         for i in range(len(choices)):
-            print('{}. {}'.format(i, choices[i]))
+            print(f'{i}. {choices[i]}')
 
         try:
             user_choice = int(ask_question('Enter Choice'))
@@ -51,13 +51,15 @@ def ask_multiple_choice_question(question, choices):
         if user_choice in range(len(choices)):
             break
         else:
-            print('Incorrect choice. Please choose a number between 0 and {}'.format(len(choices) - 1))
+            print(
+                f'Incorrect choice. Please choose a number between 0 and {len(choices) - 1}'
+            )
     return user_choice
 
 
 def ask_yes_no_question(question):
     while True:
-        answer = ask_question('{} (Y/N)'.format(question))
+        answer = ask_question(f'{question} (Y/N)')
         if answer.lower() == 'y':
             answer = 'yes'
             break
@@ -116,7 +118,7 @@ def extract_version_number_from_file(file_path):
         # IoT library from C SDK
         if match is None:
             match = re.search('\s*\*\s*(IoT.*V(.*))', content, re.MULTILINE)
-    return (match.group(1), match.group(2)) if match is not None else (None, None)
+    return (match[1], match[2]) if match is not None else (None, None)
 
 def update_version_number_in_files(file_paths, old_version_line, new_version_line):
     '''
@@ -148,16 +150,18 @@ def update_version_number_in_a_component(component, afr_path, exclude_dirs=[]):
         if version_number[0] != None and version_number[1] != None:
             version_numbers[version_number].append(file_path)
 
-    for key in version_numbers.keys():
+    for key in version_numbers:
         v0 = key[0]
         v1 = key[1]
         f = version_numbers[key]
-        print('\n{} files have the following version: {}\n'.format(len(f), v0))
+        print(f'\n{len(f)} files have the following version: {v0}\n')
 
-        options = [ 'Update version number [i.e. update "{}"].'.format(v1),
-                    'Update version line [i.e. update "{}"].'.format(v0),
-                    'List files.',
-                    'Do not update.' ]
+        options = [
+            f'Update version number [i.e. update "{v1}"].',
+            f'Update version line [i.e. update "{v0}"].',
+            'List files.',
+            'Do not update.',
+        ]
 
         while True:
             user_selected_option = ask_multiple_choice_question('What do you want to do', options)
@@ -165,34 +169,36 @@ def update_version_number_in_a_component(component, afr_path, exclude_dirs=[]):
             if user_selected_option == 0:
                 new_version_number = ask_question('Enter new version number')
                 new_version_line = v0.replace(v1, new_version_number)
-                print('Old version line: "{}". New version line: "{}".'.format(v0, new_version_line))
+                print(f'Old version line: "{v0}". New version line: "{new_version_line}".')
                 confirm = ask_yes_no_question('Does it look good')
                 if confirm == 'yes':
                     update_version_number_in_files(f, v0, new_version_line)
-                    print('Updated version line to "{}".\n'.format(new_version_line))
+                    print(f'Updated version line to "{new_version_line}".\n')
                     break
             elif user_selected_option == 1:
                 new_version_line = ask_question('Enter new version line')
-                print('Old version line: "{}". New version line: "{}".'.format(v0, new_version_line))
+                print(f'Old version line: "{v0}". New version line: "{new_version_line}".')
                 confirm = ask_yes_no_question('Does it look good')
                 if confirm == 'yes':
                     update_version_number_in_files(f, v0, new_version_line)
-                    print('Updated version line to "{}".\n'.format(new_version_line))
+                    print(f'Updated version line to "{new_version_line}".\n')
                     break
             elif user_selected_option == 2:
                 for item in f:
                     print(item)
                 print('\n')
             else:
-                print('Skipping update of {}.\n'.format(v0))
+                print(f'Skipping update of {v0}.\n')
                 break
 
 def process_components(root_dir, components, exclude_dirs=[]):
     for c in components:
         print('\n---------------------------------------------')
-        print('Component: {}'.format(c))
+        print(f'Component: {c}')
         print('---------------------------------------------\n')
-        wanna_update_version = ask_yes_no_question('Do you want to update the component "{}"'.format(c))
+        wanna_update_version = ask_yes_no_question(
+            f'Do you want to update the component "{c}"'
+        )
         if wanna_update_version == 'yes':
             update_version_number_in_a_component(c, root_dir, exclude_dirs=exclude_dirs)
 
@@ -206,7 +212,9 @@ def update_freertos_version_macros(path_macrofile, version_str, major, minor, bu
 
         if match_version.groups() and match_major.groups() and match_minor.groups() and match_build.groups():
             (old_version_string, old_version_number) = match_version.groups()
-            new_version_string = old_version_string.replace(old_version_number, '"V%s"' % version_str)
+            new_version_string = old_version_string.replace(
+                old_version_number, f'"V{version_str}"'
+            )
             macro_file_content = macro_file_content.replace(old_version_string, new_version_string)
 
             (old_major_string, old_major_number) = match_major.groups()
@@ -239,15 +247,13 @@ def update_version_number_in_freertos_component(component, root_dir, old_version
         if version_number[0] != None and version_number[1] != None:
             version_numbers[version_number].append(file_path)
 
-    for vkey in version_numbers.keys():
+    for vkey, files_using_old_version in version_numbers.items():
         old_version_string = vkey[0]
         new_version_string = new_version
 
         # Check if any of the associated versioning strings are present. Update if so
         for old_prefix in old_version_prefix_list:
             if old_prefix in old_version_string and old_version_string != new_version_string:
-                files_using_old_version = version_numbers[vkey]
-
                 if verbose:
                     print('"%s" --> "%s":\n    %s' %
                           (old_version_string,
@@ -263,17 +269,14 @@ def process_freertos_components(root_dir, components, old_version, new_version, 
     print('\nUpdating file header version numbers...')
     for c in components:
         print('\n---------------------------------------------')
-        print('Component: {}'.format(c))
+        print(f'Component: {c}')
         print('---------------------------------------------')
         update_version_number_in_freertos_component(c, root_dir, old_version, new_version, verbose)
     print('Done.')
 
 def parse_freertos_version_number(version_str):
     components = version_str.split('.') if version_str else []
-    if len(components) == 3:
-        return components
-    else:
-        return (None, None, None)
+    return components if len(components) == 3 else (None, None, None)
 
 def configure_arg_parser():
     '''
@@ -300,7 +303,7 @@ def main():
     freertos_path = args.freertos_dir
 
     if afr_path:
-        print('AFR Code: {}'.format(afr_path))
+        print(f'AFR Code: {afr_path}')
         process_components(afr_path, _AFR_COMPONENTS, exclude_dirs=_AFR_EXCLUDE_DIRS)
 
     if freertos_path:

@@ -21,7 +21,4 @@ class Policy():
 
     def exists(self):
         policies = self.client.list_policies()['policies']
-        for policy in policies:
-            if self.name == policy['policyName']:
-                return True
-        return False
+        return any(self.name == policy['policyName'] for policy in policies)

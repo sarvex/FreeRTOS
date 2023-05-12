@@ -4,8 +4,8 @@ from __future__ import print_function
 from pycparser import c_parser, c_ast, parse_file
 import sys
 
-ignore_callee = set(['mutex_acquire', 'mutex_release'])
-ignore_caller = set(['caller_reinstates_queue_predicate'])
+ignore_callee = {'mutex_acquire', 'mutex_release'}
+ignore_caller = {'caller_reinstates_queue_predicate'}
 proven = [
     'prvCopyDataFromQueue',
     'prvCopyDataToQueue',
@@ -75,9 +75,9 @@ if __name__ == "__main__":
     print('  rankdir=LR;')
     print('  node [style = filled, colorscheme = set13;];')
     for f in proven:
-        print('  %s [fillcolor = 3];' % f)
+        print(f'  {f} [fillcolor = 3];')
     for f in modeled:
-        print('  %s [fillcolor = 2];' % f)
+        print(f'  {f} [fillcolor = 2];')
     for (callee, caller) in CALLMAP:
-        print('  %s -> %s;' % (callee, caller))
+        print(f'  {callee} -> {caller};')
     print('}')

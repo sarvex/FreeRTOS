@@ -125,7 +125,7 @@ def process(folder, files):
                 """))
             LOGGER.error("The offending entry is %s", config)
             return
-        new_config_folder = os.path.join(folder, "config_" + configname)
+        new_config_folder = os.path.join(folder, f"config_{configname}")
         pathlib.Path(new_config_folder).mkdir(exist_ok=True, parents=True)
         harness_copied = False
         for file in files:

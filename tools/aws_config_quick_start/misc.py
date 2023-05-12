@@ -46,13 +46,13 @@ def format_credential_keys_text(credential_text):
 
     for credential_text_line in credential_text_lines:
         if credential_text_line.strip():
-            formatted_credential_text_line = '    {:68s}'\
-                .format('"' + credential_text_line + '\\n"')
+            formatted_credential_text_line = '    {:68s}'.format(
+                f'"{credential_text_line}' + '\\n"'
+            )
             formatted_credential_text_lines.append(
                 formatted_credential_text_line)
 
-    formatted_credential_text = ' \\\n'.join(formatted_credential_text_lines)
-    return formatted_credential_text
+    return ' \\\n'.join(formatted_credential_text_lines)
 
 
 def write_client_credentials(
@@ -94,6 +94,5 @@ def write_client_credentials(
             file_text = file_text.replace("<ClientPrivateKeyPEM>",
                                           client_private_key_pem)
 
-    header_file = open(str(file_to_modify), 'w')
-    header_file.write(file_text)
-    header_file.close()
+    with open(str(file_to_modify), 'w') as header_file:
+        header_file.write(file_text)

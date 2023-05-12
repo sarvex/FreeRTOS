@@ -156,8 +156,7 @@ MAX_LINE_WIDTH = 80
 def read_xml_file(s):
     file_dir = os.path.join(*s)
     tree = ET.parse(file_dir.strip())
-    root = tree.getroot()  # type: object
-    return root
+    return tree.getroot()
 
 
 # -----------------------------------------------------------------------------
@@ -177,7 +176,7 @@ def safe_make_folder(i):
 def create_hw_dir_struct(root_folder, TOP):
     '''Creates directory structure off root, subdirectories passed in a tupple'''
     for folder in TOP:
-        safe_make_folder(root_folder + '/' + folder)
+        safe_make_folder(f'{root_folder}/{folder}')
 
 
 # -----------------------------------------------------------------------------
@@ -277,12 +276,12 @@ def end_cplus(theFile, filename):
 def write_line(headerFile , reg_description):
     ''' write line, break into chunks '''
     word_list = reg_description.split()  # list of words
-    sentence = word_list[0] + ' '
+    sentence = f'{word_list[0]} '
     word_list.pop(0)
     for word in word_list:
         if (len(sentence + word + ' ') > MAX_LINE_WIDTH):
             headerFile.write(sentence.rstrip() + '\n')
-            sentence = word + ' '
+            sentence = f'{word} '
         else:
             sentence = sentence + word + ' '
     if len(sentence) > 0:
@@ -300,11 +299,12 @@ def generate_register(headerFile, registers, tags):
     :param tags: Some tags used to determine print format
     :return:
     '''
+    reg_value_default = 0
     for register in registers:
         # if tag 4 is set, pre-append register name with tag[4] value
         if tags[4] != 'none':
             pre_append = tags[4]
-            name = 'LIBERO_SETTING_' + pre_append + register.get('name')
+            name = f'LIBERO_SETTING_{pre_append}' + register.get('name')
         else:
             name = 'LIBERO_SETTING_' + register.get('name')
         name_of_reg = name
@@ -320,7 +320,6 @@ def generate_register(headerFile, registers, tags):
         stest1 = '#define' + ' ' + name.ljust(name_gap, ' ')
         field_list = []
         reg_value = 0
-        reg_value_default = 0
         for field in register:
             if field.tag == "field":
                 gap = 30
@@ -332,7 +331,7 @@ def generate_register(headerFile, registers, tags):
                 sfield += stemp
                 sfield += field.get('Type')
                 if (field.get('Type') == 'RW'):
-                    sfield += ' value= ' + field.text.strip()
+                    sfield += f' value= {field.text.strip()}'
                     temp_val = ((int(field.text.strip(), 16)) << int(field.get('offset')))
                     reg_value += temp_val
                 sfield += ' */\n'
@@ -351,13 +350,13 @@ def generate_register(headerFile, registers, tags):
         if len(s) >= name_gap:
             name_gap = len(s) + 4
         s = s.ljust(name_gap, ' ') + value + '\n'
-        reg_description = '/*' + description + ' */\n'
+        reg_description = f'/*{description}' + ' */\n'
         headerFile.write('#if !defined ' + '(' + name_of_reg + ')\n')
         # Write out the register description, max chars per line 80
         write_line(headerFile , reg_description)
         headerFile.write(s)
-        for x in range(len(field_list)):
-            headerFile.write(field_list[x])
+        for field_ in field_list:
+            headerFile.write(field_)
         headerFile.write('#endif\n')
 
 
@@ -375,7 +374,7 @@ def generate_mem_elements(headerFile, mem_elements, tags):
     for mem in mem_elements:
         name = 'LIBERO_SETTING_' + mem.get('name')
         name_of_reg = name
-        name_size = name + '_SIZE'
+        name_size = f'{name}_SIZE'
         description = mem.get('description')
         name_gap = 15
         if len(name) > 15:
@@ -395,7 +394,7 @@ def generate_mem_elements(headerFile, mem_elements, tags):
             name_size_gap = len(s1) + 4
         # create the strings for writing
         s = s.ljust(name_gap, ' ') + mem_value +  '\n'
-        reg_description = '/*' + description + ' */\n'
+        reg_description = f'/*{description}' + ' */\n'
         s1 = s1.ljust(name_size_gap, ' ') + mem_size \
              + '    /* Length of memory block*/ \n'
         headerFile.write('#if !defined ' + '(' + name_of_reg + ')\n')
@@ -435,11 +434,11 @@ def write_libero_config_info(root,theFile):
     script_version = get_script_ver().split('.')
     tags_dic = {"design_name":"LIBERO_SETTING_DESIGN_NAME","libero_version":"LIBERO_SETTING_MSS_CONFIGURATOR_VERSION","mpfs_part_no" :"LIBERO_SETTING_MPFS_PART "\
         ,"creation_date_time":"LIBERO_SETTING_GENERATION_DATE","xml_format_version":"LIBERO_SETTING_XML_VERSION"}
-    
-    #max constant name size + some extra buffer space  
-    max_gap = max([len(v) for k,v in tags_dic.items()]) + 8
 
-    fixed_gap = 12 
+    #max constant name size + some extra buffer space
+    max_gap = max(len(v) for k,v in tags_dic.items()) + 8
+
+    fixed_gap = 12
     xml_version = []
     for child in root:
             if child.tag == "design_information":
@@ -449,16 +448,16 @@ def write_libero_config_info(root,theFile):
                         theFile.write('#define  '+ tags_dic[child1.tag].ljust(4,' ') + " "*(gap + fixed_gap)  + "\"" + child1.text.strip() + "\"" + "\n")  
                         if child1.tag == "xml_format_version":
                             xml_version = child1.text.strip().split('.')
-    
+
     const = {"LIBERO_SETTING_XML_VERSION_MAJOR": xml_version[0],"LIBERO_SETTING_XML_VERSION_MINOR":xml_version[1],"LIBERO_SETTING_XML_VERSION_PATCH":xml_version[2], "LIBERO_SETTING_HEADER_GENERATOR_VERSION":'.'.join(script_version),"LIBERO_SETTING_HEADER_GENERATOR_VERSION_MAJOR":script_version[0],"LIBERO_SETTING_HEADER_GENERATOR_VERSION_MINOR":script_version[1],"LIBERO_SETTING_HEADER_GENERATOR_VERSION_PATCH":script_version[2]}
-    
+
     # write hard coded constants in the fpga_design_config.h file.
     for k,v in const.items(): 
         gap = max_gap - len(k)
         if k == "LIBERO_SETTING_HEADER_GENERATOR_VERSION":
-            theFile.write('#define  '+ k.ljust(4,' ') + " "*(gap + fixed_gap)  + "\"" + v + "\"" + "\n")  
+            theFile.write('#define  '+ k.ljust(4,' ') + " "*(gap + fixed_gap)  + "\"" + v + "\"" + "\n")
         else:
-            theFile.write('#define  '+ k + " "*(gap + fixed_gap)  + v  + "\n")  
+            theFile.write(f'#define  {k}' + " "*(gap + fixed_gap) + v + "\n")
     #new line 
     theFile.write("\n")
 
@@ -479,15 +478,13 @@ def generate_reference_header_file(ref_header_file, root, header_files):
 
         #define Libero design information constants 
         write_libero_config_info(root,headerFile)
-        index = 0
-        for child in header_files:
+        for index, child in enumerate(header_files):
             c = header_files[index].split(',')
             c.remove('fpga_design_config')
             # include_file = os.path.join(*c)
             # as we need formatting correct for linux and windows
-            include_file = c[0] + '/' + c[1]
+            include_file = f'{c[0]}/{c[1]}'
             headerFile.write('#include \"' + include_file + '\"\n')
-            index += 1
         # add the c++ define
         start_cplus(headerFile, file_name)
         # no content in this case
@@ -515,7 +512,7 @@ def generate_header_files(output_header_files, input_xml_file, input_xml_tags):
         file_dir = os.path.join(*s)
         found_match = 0
         for child in root:
-            if child.tag == 'mss_' + dir_name:
+            if child.tag == f'mss_{dir_name}':
                 for child1 in child:
                     if child1.tag == ref_tags[1]:
                         found_match = 1
@@ -548,37 +545,33 @@ def get_full_path(in_path):
         path_comp = in_path.split('/')
         last = len(path_comp) - 1
         filename = path_comp[last]
-        
+
         in_path = in_path.replace(filename, '')
         print(in_path)
     if in_path == '':
-        filename = temp 
+        filename = temp
         in_path = os.getcwd()
-        print(in_path)
     else:
-        xml_list = [] 
+        xml_list = []
         dir_entries = os.listdir(in_path)
         for dir_entry in dir_entries:
 
             if dir_entry.endswith('.xml'):
                 xml_list.append(dir_entry)
-            else:
-                if dir_entry.endswith('_mss_cfg.xml'):
-                    xml_list.append(dir_entry) 
-                    break
-       #This section  will sort the xml file by the latest timestamp  
+            elif dir_entry.endswith('_mss_cfg.xml'):
+                xml_list.append(dir_entry) 
+                break
+       #This section  will sort the xml file by the latest timestamp
         if len(xml_list) > 1:
 
             xml_list = sort_by_timestamp(xml_list,in_path)
             filename = xml_list[-1]
-            #prompt the selected filename 
-            print("selected xml file is : {}".format(filename))
-        else:
-            if len(xml_list) != 0:
-                filename = xml_list[0]
+            #prompt the selected filename
+            print(f"selected xml file is : {filename}")
+        elif len(xml_list) != 0:
+            filename = xml_list[0]
 
-        print(in_path)
-        
+    print(in_path)
     try:
         print("trying to change directory")
         os.chdir(in_path)
@@ -588,12 +581,11 @@ def get_full_path(in_path):
         sys.exit()
 
     os.chdir(cwd)
-    full_path = full_path + '/' + filename
-    if is_empty_file(full_path):
-        print("\nxml File is empty")
-        sys.exit()
-    else:
+    full_path = f'{full_path}/{filename}'
+    if not is_empty_file(full_path):
         return full_path
+    print("\nxml File is empty")
+    sys.exit()
 
 
 # -------------------------------------------------------
@@ -615,12 +607,9 @@ def sort_by_timestamp(file_name,file_path):
         sys.exit()
 
 
-    Files = [path + '/' + file_name[i] for i in range(len(file_name))]
+    Files = [f'{path}/{file_name[i]}' for i in range(len(file_name))]
     Files.sort(key=os.path.getmtime)
-    s_file_name = []
-    for i in range(len(Files)):
-        s_file_name.append(Files[i].split('/')[-1])
-    
+    s_file_name = [File.split('/')[-1] for File in Files]
     print("sorted list of files\n",s_file_name)
     os.chdir(cwd)
     return s_file_name
@@ -629,7 +618,7 @@ def sort_by_timestamp(file_name,file_path):
 # helper for showing help information
 # -----------------------------------------------------------------------------
 def show_help():
-    print ('no of args you entered = ' + str(len(sys.argv) - 1))
+    print(f'no of args you entered = {str(len(sys.argv) - 1)}')
     print ('mpfs_configuration_generator.py :')
     print (' This program reads xml hardware definition, outputs: header files')
     print \
@@ -673,15 +662,9 @@ def main_config_generator():
         output_folder_name = get_full_path(output_folder_name)
         os.chdir(output_folder_name)
 
-    debug_reg_csv = False
-    if nb_arguments >= 4:
-        if argumentList[3] == 'debug_regs':
-            debug_reg_csv = True
+    debug_reg_csv = nb_arguments >= 4 and argumentList[3] == 'debug_regs'
     if nb_arguments >= 3:
-        if argumentList[2] == 'generate_refernce_xml':
-            gen_xml = True
-        else:
-            gen_xml = False
+        gen_xml = argumentList[2] == 'generate_refernce_xml'
     #
     # Check version of python interpreter, helps debugging
     # Currently runs on python version 2 and 3
@@ -693,7 +676,7 @@ def main_config_generator():
     else:
     #    # Python 2 code in this block
         print ('python interpreter running is version 2')
-    
+
     # Create directory structure for the header files
     #
     root_folder = 'fpga_design_config'

@@ -88,7 +88,7 @@ def make_header_file(goto_binary, fyle, target_folder):
     fyle = os.path.normpath(fyle)
     with TemporaryDirectory() as tmpdir:
         module = get_module_name(fyle)
-        header_file = "{}_datastructure.h".format(module)
+        header_file = f"{module}_datastructure.h"
 
         drop_header_cmd = ["goto-instrument",
                            "--dump-c-type-header",

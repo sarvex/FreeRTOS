@@ -22,8 +22,7 @@ class Certificate():
         return cert
 
     def create_keys_and_certificate(self):
-        result = self.client.create_keys_and_certificate(setAsActive=True)
-        return result
+        return self.client.create_keys_and_certificate(setAsActive=True)
 
     def delete(self):
         cert_not_found = True
@@ -43,9 +42,7 @@ class Certificate():
                                            newStatus='INACTIVE')
             cert_not_found = False
         except self.client.exceptions.ResourceNotFoundException:
-            cert_not_found = True
-            return cert_not_found
-
+            return True
         # Delete the certificate
         try:
             self.client.delete_certificate(certificateId=self.id)
@@ -55,10 +52,7 @@ class Certificate():
         return cert_not_found
 
     def exists(self):
-        if self.id == '':
-            return False
-        else:
-            return True
+        return self.id != ''
 
     def get_arn(self):
         return self.arn

@@ -50,10 +50,7 @@ except NameError:
 
 # ast.Num was deprecated in python 3.8
 _plat = platform.python_version().split(".")
-if _plat[0] == "3" and int(_plat[1]) > 7:
-    ast_num = ast.Constant
-else:
-    ast_num = ast.Num
+ast_num = ast.Constant if _plat[0] == "3" and int(_plat[1]) > 7 else ast.Num
 # ______________________________________________________________________________
 
 
@@ -155,8 +152,7 @@ def dump_makefile(dyr, system):
     # Makefile.common expects a variable called OBJS_EXCEPT_HARNESS to be
     # set to a list of all the object files except the harness.
     if "OBJS" not in data:
-        logging.error(
-            "Expected a list of object files in %s/Makefile.json" % dyr)
+        logging.error(f"Expected a list of object files in {dyr}/Makefile.json")
         exit(1)
     makefile["OBJS_EXCEPT_HARNESS"] = " ".join(
         o for o in data["OBJS"] if not o.endswith("_harness.goto"))
@@ -164,9 +160,7 @@ def dump_makefile(dyr, system):
     so_far = collections.OrderedDict()
     for name, value in data.items():
         if isinstance(value, list):
-            new_value = []
-            for item in value:
-                new_value.append(compute(item, so_far, system, name, dyr, True))
+            new_value = [compute(item, so_far, system, name, dyr, True) for item in value]
             makefile[name] = " ".join(new_value)
         else:
             makefile[name] = compute(value, so_far, system, name, dyr)
@@ -176,11 +170,11 @@ def dump_makefile(dyr, system):
         makefile["EXPECTED"] = "SUCCESSFUL"
     elif str(makefile["EXPECTED"]).lower() == "false":
         makefile["EXPECTED"] = "FAILURE"
-    makefile = ["H_%s = %s" % (k, v) for k, v in makefile.items()]
+    makefile = [f"H_{k} = {v}" for k, v in makefile.items()]
 
     # Deal with the case of a harness being nested several levels under
     # the top-level proof directory, where the common Makefile lives
-    common_dir_path = "..%s" % _platform_choices[system]["path-sep"]
+    common_dir_path = f'..{_platform_choices[system]["path-sep"]}'
     common_dir_path = common_dir_path * len(dyr.split(os.path.sep)[1:])
 
     with open(os.path.join(dyr, "Makefile"), "w") as handle:
@@ -225,18 +219,16 @@ def compute(value, so_far, system, key, harness, appending=False):
                               key, value)
 
     if key == "DEF":
-        final_value = "%s%s" % (_platform_choices[system]["define"],
-                                evaluated)
+        final_value = f'{_platform_choices[system]["define"]}{evaluated}'
     elif key == "INC":
-        final_value = "%s%s" % (_platform_choices[system]["include"],
-                                evaluated)
+        final_value = f'{_platform_choices[system]["include"]}{evaluated}'
     else:
         final_value = evaluated
 
     # Allow this value to be used for future variable substitution
     if appending:
         try:
-            so_far[key] = "%s %s" % (so_far[key], final_value)
+            so_far[key] = f"{so_far[key]} {final_value}"
         except KeyError:
             so_far[key] = final_value
         logging.debug("Appending final value '%s' to key '%s'",
@@ -276,9 +268,7 @@ def eval_expr(expr_string, harness, key, value):
                     in file %s at key '%s', there was an invalid guard
                     for an if statement."""), harness, key)
                 exit(1)
-            if guard:
-                return eval_single_node(node.body)
-            return eval_single_node(node.orelse)
+            return eval_single_node(node.body) if guard else eval_single_node(node.orelse)
         if isinstance(node, ast.Compare):
             left = eval_single_node(node.left)
             # Don't allow expressions like (a < b) < c
@@ -353,31 +343,40 @@ _platform_choices["macos"] = _mac_os
 
 
 def default_platform():
-    for arg_string, os_data in _platform_choices.items():
-        if sys.platform == os_data["platform"]:
-            return arg_string
-    return "linux"
+    return next(
+        (
+            arg_string
+            for arg_string, os_data in _platform_choices.items()
+            if sys.platform == os_data["platform"]
+        ),
+        "linux",
+    )
 
 
-_args = [{
-    "flags": ["-s", "--system"],
-    "metavar": "OS",
-    "choices": _platform_choices,
-    "default": str(default_platform()),
-    "help": textwrap.dedent("""\
+_args = [
+    {
+        "flags": ["-s", "--system"],
+        "metavar": "OS",
+        "choices": _platform_choices,
+        "default": str(default_platform()),
+        "help": textwrap.dedent(
+            """\
                 which operating system to generate makefiles for.
                 Defaults to the current platform (%(default)s);
-                choices are {choices}""").format(
-                    choices="[%s]" % ", ".join(_platform_choices)),
-}, {
-    "flags": ["-v", "--verbose"],
-    "help": "verbose output",
-    "action": "store_true",
-}, {
-    "flags": ["-w", "--very-verbose"],
-    "help": "very verbose output",
-    "action": "store_true",
-    }]
+                choices are {choices}"""
+        ).format(choices=f'[{", ".join(_platform_choices)}]'),
+    },
+    {
+        "flags": ["-v", "--verbose"],
+        "help": "verbose output",
+        "action": "store_true",
+    },
+    {
+        "flags": ["-w", "--very-verbose"],
+        "help": "very verbose output",
+        "action": "store_true",
+    },
+]
 
 
 def get_args():

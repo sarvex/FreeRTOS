@@ -24,10 +24,7 @@ class Thing():
 
     def exists(self):
         list_of_things = self.client.list_things()['things']
-        for thing in list_of_things:
-            if thing['thingName'] == self.name:
-                return True
-        return False
+        return any(thing['thingName'] == self.name for thing in list_of_things)
 
     def attach_principal(self, arn):
         assert self.exists(), "Thing does not exist"

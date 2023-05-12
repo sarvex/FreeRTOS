@@ -73,18 +73,18 @@ def find_proofs_in_json_file(filename):
         with open(filename) as proofs:
             return json.load(proofs)[JSON_KEY]
     except (FileNotFoundError, KeyError):
-        raise UserWarning("Can't find key {} in json file {}".format(JSON_KEY, filename))
+        raise UserWarning(f"Can't find key {JSON_KEY} in json file {filename}")
     except json.decoder.JSONDecodeError:
-        raise UserWarning("Can't parse json file {}".format(filename))
+        raise UserWarning(f"Can't parse json file {filename}")
 
 def find_proofs_in_filesystem():
     """Locate the folders containing proofs in the filesystem."""
 
-    proofs = []
-    for root, _, files in os.walk('.'):
-        if FS_KEY in files:
-            proofs.append(os.path.normpath(root))
-    return proofs
+    return [
+        os.path.normpath(root)
+        for root, _, files in os.walk('.')
+        if FS_KEY in files
+    ]
 
 ################################################################
 # The strings used to write sections of the ninja file
@@ -177,13 +177,13 @@ build open: phony {open_targets}
 def get_entry(folder):
     """Find the name of the proof in the proof Makefile."""
 
-    with open('{}/Makefile'.format(folder)) as makefile:
+    with open(f'{folder}/Makefile') as makefile:
         for line in makefile:
             if line.strip().lower().startswith('entry'):
                 return line[line.find('=')+1:].strip()
             if line.strip().lower().startswith('h_entry'):
                 return line[line.find('=')+1:].strip()
-    raise UserWarning("Can't find ENTRY in {}/Makefile".format(folder))
+    raise UserWarning(f"Can't find ENTRY in {folder}/Makefile")
 
 def write_ninja_build_file():
     """Write a ninja build file to generate proof results."""
@@ -205,7 +205,7 @@ def write_ninja_build_file():
             entry = get_entry(proof)
             ninja.write(NINJA_BUILDS.format(folder=proof, entry=entry))
         targets = lambda kind, folders: ' '.join(
-            ['{}_{}'.format(kind, folder) for folder in folders]
+            [f'{kind}_{folder}' for folder in folders]
         )
         ninja.write(NINJA_GLOBALS.format(
             clean_targets=targets('clean', proofs),

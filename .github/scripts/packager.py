@@ -41,7 +41,7 @@ LABS_RELATIVE_EXCLUDE_FILES = [
 # Helpers
 # -------------------------------------------------------------------------------------------------
 def info(msg):
-    print('[INFO]: %s' % str(msg))
+    print(f'[INFO]: {str(msg)}')
 
 def authorize_filetree_diff():
     '''
@@ -125,7 +125,7 @@ def create_file_trees(intree_dir, baseline_zip, outtree_dir, git_link, outtree_n
 
     # Input baseline file tree
     if baseline_zip != None:
-        print("Unzipping baseline: '%s'..." % baseline_zip)
+        print(f"Unzipping baseline: '{baseline_zip}'...")
         path_in_tree = unzip_baseline_zip(baseline_zip, intree_dir)
         print('Done.')
 
@@ -146,12 +146,9 @@ def prune_result_tree(path_root, exclude_files=[], dry_run=False):
             if os.path.isfile(path_full):
                 if not dry_run:
                     os.remove(path_full)
-                files_removed.append(path_full)
-            else:
-                if not dry_run:
-                    shutil.rmtree(path_full)
-                files_removed.append(path_full)
-
+            elif not dry_run:
+                shutil.rmtree(path_full)
+            files_removed.append(path_full)
     return files_removed
 
 def prune_result_tree_v2(tree_root, exclude_files=[], dry_run=False):
@@ -194,11 +191,11 @@ def show_package_diagnostics(path_newzip, path_basezip):
                '+' if size_diff_KB >= 0 else '', size_diff_KB))
 
 def create_package(path_ziproot, path_outtree, package_name, exclude_files=[]):
-    print("Packaging '%s'..." % package_name)
+    print(f"Packaging '{package_name}'...")
     pruned_files = prune_result_tree(path_outtree, exclude_files)
     print('Files removed:\n    %s' % '\n    '.join(pruned_files))
 
-    path_outzip = '%s.zip' % package_name
+    path_outzip = f'{package_name}.zip'
     zip_result_tree(path_ziproot, path_outzip)
     print('Done.')
 
@@ -240,7 +237,7 @@ def sanitize_cmd_args(args):
         info('No FreeRTOS baseline zip provided. Zip-comparison diagnostics will not be provided...')
         args.core_input_zip = None
     elif not os.path.exists(args.core_input_zip):
-        error('Input zip does not exist: %s' % args.core_input_zip)
+        error(f'Input zip does not exist: {args.core_input_zip}')
         exit(1)
 
     # Check FreeRTOS Labs options
@@ -248,11 +245,11 @@ def sanitize_cmd_args(args):
         info('No FreeRTOS-Labs baseline zip provided. Zip-comparison diagnostics will not be provided...')
         args.labs_input_zip = None
     elif not os.path.exists(args.labs_input_zip):
-        error('Input zip does not exist: %s' % args.input_zip)
+        error(f'Input zip does not exist: {args.input_zip}')
         exit(1)
 
     # Check version options
-    if args.zip_version == None:
+    if args.zip_version is None:
         info('No version string provide. Will use "XX.YY.ZZ" as version suffix...')
         args.zip_version = 'XX.YY.ZZ'
 
@@ -267,7 +264,7 @@ def main():
     setup_intermediate_files(DIR_INTERMEDIATE_FILES, DIR_INPUT_TREES, DIR_OUTPUT_TREES)
 
     # Create FreeRTOS and FreeRTOS-Labs packages
-    core_package_name = 'FreeRTOSv%s' % args.zip_version
+    core_package_name = f'FreeRTOSv{args.zip_version}'
     (path_core_in_tree, path_core_out_tree) = create_file_trees(DIR_INPUT_TREES,
                                                                 args.core_input_zip,
                                                                 DIR_OUTPUT_TREES,
@@ -275,7 +272,7 @@ def main():
                                                                 core_package_name,
                                                                 commit_id=args.freertos_commit)
 
-    if path_core_out_tree == None:
+    if path_core_out_tree is None:
         print('Failed to prepare repo for zipping')
         exit(1);
 
@@ -288,7 +285,7 @@ def main():
                                                                 DIR_OUTPUT_TREES,
                                                                 LABS_GIT_LINK,
                                                                 labs_package_name)
-    if path_labs_out_tree == None:
+    if path_labs_out_tree is None:
         print('Failed to prepare repo for zipping')
         exit(1);
 

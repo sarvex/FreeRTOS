@@ -46,11 +46,8 @@ def create_resources():
             raise Exception("Fleet Provisioning resource stack failed to create successfully. You may need to delete the stack and retry."
                             + "\nView the stack in the CloudFormation console here:\n" + convert_cf_arn_to_link(stack_response["StackId"]))
     else:
-        # Read the cloudformation template file contained in the same directory
-        cf_template_file = open(f"{script_file_dir_abs_path}/cloudformation_template.json", "r")
-        cf_template = cf_template_file.read()
-        cf_template_file.close()
-
+        with open(f"{script_file_dir_abs_path}/cloudformation_template.json", "r") as cf_template_file:
+            cf_template = cf_template_file.read()
         create_response = cf.create_stack(
             StackName=RESOURCE_STACK_NAME,
             TemplateBody=cf_template,
@@ -96,23 +93,20 @@ def create_credentials():
 def update_demo_config():
     endpoint = iot.describe_endpoint(endpointType='iot:Data-ATS')
 
-    template_file = open(f"{script_file_dir_abs_path}/demo_config.templ", 'r')
-    file_text = template_file.read()
-    file_text = file_text.replace(
-        "<IOTEndpoint>", "\"" + endpoint["endpointAddress"] + "\"")
+    with open(f"{script_file_dir_abs_path}/demo_config.templ", 'r') as template_file:
+        file_text = template_file.read()
+        file_text = file_text.replace(
+            "<IOTEndpoint>", "\"" + endpoint["endpointAddress"] + "\"")
 
-    header_file = open(f"{script_file_dir_abs_path}/../demo_config.h", "w")
-    header_file.write(file_text)
-    header_file.close()
-    template_file.close()
+        with open(f"{script_file_dir_abs_path}/../demo_config.h", "w") as header_file:
+            header_file.write(file_text)
     print("Successfully updated demo_config.h")
 
 # Get arguments
 def get_args():
     parser = argparse.ArgumentParser(description="Fleet Provisioning Demo setup script.")
     parser.add_argument("--force", action="store_true", help="Used to skip the user prompt before executing.")
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 # Parse arguments and execute appropriate functions
 def main():

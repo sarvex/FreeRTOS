@@ -25,12 +25,12 @@ def get_presigned_urls(bucket_name, key_name, region_name) -> None:
     client_method_dict = {"GET": "get_object", "PUT": "put_object"}
 
     # Generate the URL to get 'key-name' from 'bucket-name'
-    for method in client_method_dict.keys():
+    for method in client_method_dict:
         url = s3.generate_presigned_url(
             ClientMethod=client_method_dict[method],
             Params={"Bucket": bucket_name, "Key": key_name},
         )
-        print("#define democonfigS3_PRESIGNED_" + method + "_URL" + "    " + '"' + url + '"\n')
+        print(f'#define democonfigS3_PRESIGNED_{method}_URL    "{url}' + '"\n')
 
 
 def main():

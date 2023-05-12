@@ -58,10 +58,14 @@ platform_definitions = {
 
 
 def default_platform():
-    for platform, definition in platform_definitions.items():
-        if sys.platform == definition["platform"]:
-            return platform
-    return "linux"
+    return next(
+        (
+            platform
+            for platform, definition in platform_definitions.items()
+            if sys.platform == definition["platform"]
+        ),
+        "linux",
+    )
 
 
 def patch_path_separator(opsys, string):
@@ -121,7 +125,7 @@ def read_variable_definitions(filename):
 def find_definition_once(key, defines, prefix=None):
 
     # Try looking up key with and without prefix
-    prefix = "{}_".format(prefix.rstrip('_')) if prefix else ""
+    prefix = f"{prefix.rstrip('_')}_" if prefix else ""
     key2 = key[len(prefix):] if key.startswith(prefix) else prefix + key
 
     for _key in [key, key2]:
@@ -147,17 +151,16 @@ def construct_definition(opsys, key_prefix, value_prefix, key, definitions):
     if key in ["INC", "DEF"]:
         values = [patch_path_separator(opsys, value)
                   for value in values]
-    lines = ["\t{}{} \\".format(value_prefix, value) for value in values]
+    lines = [f"\t{value_prefix}{value} \\" for value in values]
     return "{}_{} = \\\n{}\n\t# empty\n".format(key_prefix,
                                                 key,
                                                 '\n'.join(lines))
 
 def write_define(opsys, define, defines, makefile):
-    value = find_definition(define, defines)
-    if value:
+    if value := find_definition(define, defines):
         if define in ["FREERTOS", "PROOFS"]:
             value = os.path.abspath(value[0])
-        makefile.write("{} = {}\n".format(define, value))
+        makefile.write(f"{define} = {value}\n")
 
 def write_common_defines(opsys, defines, makefile):
     common_defines, opsys_defines, harness_defines = defines
@@ -170,10 +173,9 @@ def write_common_defines(opsys, defines, makefile):
                                       platform_definitions[opsys]["define"],
                                       "", ""],
                                      ["INC", "DEF", "OPT", "CBMCFLAGS"]):
-            define = construct_definition(opsys,
-                                          key_prefix, value_prefix,
-                                          key, defines)
-            if define:
+            if define := construct_definition(
+                opsys, key_prefix, value_prefix, key, defines
+            ):
                 makefile.write(define + "\n")
 
 
@@ -185,12 +187,13 @@ def write_makefile(opsys, template, defines, makefile):
             values = [find_definition(key, defines) for key in keys]
             for key, value in zip(keys, values):
                 if value is not None:
-                    line = line.replace('@{}@'.format(key), " ".join(value))
+                    line = line.replace(f'@{key}@', " ".join(value))
                     line = patch_compile_output(opsys, line, key, value)
             makefile.write(line)
 
 def write_cbmcbatchyaml_target(opsys, _makefile):
-    target = """
+    if opsys != "windows":
+        target = """
 ################################################################
 # Build configuration file to run cbmc under cbmc-batch in CI
 
@@ -208,7 +211,6 @@ cbmc-batch.yaml:
 
 ################################################################
 """
-    if opsys != "windows":
         _makefile.write(target)
 
 def makefile_from_template(opsys, template, defines, makefile="Makefile"):

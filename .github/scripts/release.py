@@ -48,24 +48,23 @@ def logIndentPop():
     global indent_level
     indent_level -= 4
 
-    if indent_level < 0:
-        indent_level = 0
+    indent_level = max(indent_level, 0)
 
 def info(msg, end='\n'):
-    print('[INFO]: %s%s' % (' ' * indent_level, str(msg)), end=end, flush=True)
+    print(f"[INFO]: {' ' * indent_level}{str(msg)}", end=end, flush=True)
 
 def warning(msg):
-    print('[WARNING]: %s%s' % (' ' * indent_level, str(msg)), flush=True)
+    print(f"[WARNING]: {' ' * indent_level}{str(msg)}", flush=True)
 
 def error(msg):
-    print('[ERROR]: %s%s' % (' ' * indent_level, str(msg)), flush=True)
+    print(f"[ERROR]: {' ' * indent_level}{str(msg)}", flush=True)
 
 def debug(msg):
-    print('[DEBUG]: %s%s' % (' ' * indent_level, str(msg)), flush=True)
+    print(f"[DEBUG]: {' ' * indent_level}{str(msg)}", flush=True)
 
 # Callback for progress updates. For long spanning gitpython commands
 def printDot(op_code, cur_count, max_count=None, message=''):
-    if max_count == None or cur_count == max_count:
+    if max_count is None or cur_count == max_count:
         print('.', end='')
 
 class BaseRelease:
@@ -84,7 +83,7 @@ class BaseRelease:
         self.do_not_push = do_not_push
 
         if self.repo_path:
-            info('Sourcing "%s" to make local commits' % self.repo_path)
+            info(f'Sourcing "{self.repo_path}" to make local commits')
             self.local_repo = Repo(self.repo_path)
 
     def CheckRelease(self):
@@ -96,24 +95,20 @@ class BaseRelease:
 
     def hasTag(self, tag):
         remote_tags = self.repo.get_tags()
-        for t in remote_tags:
-            if t.name == tag:
-                return True
-
-        return False
+        return any(t.name == tag for t in remote_tags)
 
     def commitChanges(self, msg):
         assert self.local_repo != None, 'Failed to commit. Git repo uninitialized.'
 
-        info('Committing: "%s"' % msg)
+        info(f'Committing: "{msg}"')
         self.local_repo.git.add(update=True)
         commit = self.local_repo.index.commit(msg)
 
     def getRemoteEndpoint(self, repo_name):
         if self.git_ssh:
-            return 'git@github.com:%s.git' % repo_name
+            return f'git@github.com:{repo_name}.git'
         else:
-            return 'https://github.com/%s.git' % repo_name
+            return f'https://github.com/{repo_name}.git'
 
     def printReleases(self):
         releases = self.repo.get_releases()
@@ -129,24 +124,26 @@ class BaseRelease:
 
             # Check for any errors
             for push_info in push_infos:
-                assert 0 == push_info.flags & PushInfo.ERROR, 'Failed to push changes to ' + str(push_info)
+                assert (
+                    0 == push_info.flags & PushInfo.ERROR
+                ), f'Failed to push changes to {str(push_info)}'
 
     def pushTag(self):
         if self.do_not_push:
-            info('Skipping to push tag "%s"' % self.tag)
+            info(f'Skipping to push tag "{self.tag}"')
         else:
             # Overwrite existing tags
-            info('Pushing tag "%s"' % self.tag)
+            info(f'Pushing tag "{self.tag}"')
             tag_info = self.local_repo.create_tag(self.tag, message=self.tag_msg, force=True)
             self.local_repo.git.push(tags=True, force=True)
 
     def deleteTag(self):
         # Remove from remote
         if self.tag in self.local_repo.tags:
-            info('Deleting tag "%s"' % self.tag)
-            self.local_repo.remote('origin').push(':%s' % self.tag)
+            info(f'Deleting tag "{self.tag}"')
+            self.local_repo.remote('origin').push(f':{self.tag}')
         else:
-            info('A tag does not exists for "%s". No need to delete.' % self.tag)
+            info(f'A tag does not exists for "{self.tag}". No need to delete.')
 
     def updateSubmodulePointer(self, rel_path, ref):
         submodule = Repo(rel_path)
@@ -154,7 +151,7 @@ class BaseRelease:
         submodule.git.checkout(ref)
 
     def updateFileHeaderVersions(self, old_version_substrings, new_version_string):
-        info('Updating file header versions for "%s"...' % self.version, end='')
+        info(f'Updating file header versions for "{self.version}"...', end='')
         n_updated = 0
         n_updated += update_version_number_in_freertos_component(self.repo_path,
                                                                  '.',
@@ -170,30 +167,31 @@ class BaseRelease:
 
         print('...%d Files updated.' % n_updated)
 
-        self.commitChanges(self.commit_msg_prefix + 'Bump file header version to "%s"' % self.version)
+        self.commitChanges(
+            f'{self.commit_msg_prefix}Bump file header version to "{self.version}"'
+        )
 
     def deleteGitRelease(self):
-        info('Deleting git release endpoint for "%s"' % self.tag)
+        info(f'Deleting git release endpoint for "{self.tag}"')
 
         try:
             self.repo.get_release(self.tag).delete_release()
         except UnknownObjectException:
-            info('A release endpoint does not exist for "%s". No need to erase.' % self.tag)
+            info(f'A release endpoint does not exist for "{self.tag}". No need to erase.')
         except:
             assert False, 'Encountered error while trying to delete git release endpoint'
 
     def rollbackAutoCommits(self, n_autocommits=2, n_search=25):
-        info('Rolling back "%s" autocommits' % self.tag)
+        info(f'Rolling back "{self.tag}" autocommits')
 
         if self.tag not in self.local_repo.tags:
-            error('Could not find a SHA to rollback to for tag "%s"' % self.tag)
+            error(f'Could not find a SHA to rollback to for tag "{self.tag}"')
             return False
 
         # Search for auto release SHAs that match the release tag SHA
-        tag_commit = self.local_repo.tag('refs/tags/%s' % self.tag).commit
+        tag_commit = self.local_repo.tag(f'refs/tags/{self.tag}').commit
         prior_commit = self.local_repo.commit(tag_commit.hexsha + '~%d' % n_autocommits)
-        n_commits_searched = 0
-        for commit in self.local_repo.iter_commits():
+        for n_commits_searched, commit in enumerate(self.local_repo.iter_commits()):
             if n_commits_searched > n_search:
                 error('Exhaustively searched but could not find tag commit to rollback')
                 return False
@@ -202,20 +200,19 @@ class BaseRelease:
                     and commit.hexsha == tag_commit.hexsha
                     and self.version in commit.message):
 
-                info('Found matching tag commit %s. Reverting to prior commit %s'
-                        % (tag_commit.hexsha, prior_commit.hexsha))
+                info(
+                    f'Found matching tag commit {tag_commit.hexsha}. Reverting to prior commit {prior_commit.hexsha}'
+                )
 
                 # Found the commit prior to this autorelease. Revert back to it then push
                 self.local_repo.git.reset(prior_commit.hexsha, hard=True)
                 self.pushLocalCommits(force=True)
                 return True
 
-            n_commits_searched += 1
-
         return False
 
     def restorePriorToRelease(self):
-        info('Restoring "main" to just before autorelease:%s' % self.version)
+        info(f'Restoring "main" to just before autorelease:{self.version}')
 
         self.deleteGitRelease()
         self.rollbackAutoCommits()
@@ -227,11 +224,11 @@ class KernelRelease(BaseRelease):
     def __init__(self, mGit, version, commit='HEAD', git_ssh=False, git_org='FreeRTOS', repo_path=None, branch='main', main_br_version='', do_not_push=False):
         super().__init__(mGit, version, commit=commit, git_ssh=git_ssh, git_org=git_org, repo_path=repo_path, branch=branch, do_not_push=do_not_push)
 
-        self.repo_name = '%s/FreeRTOS-Kernel' % self.git_org
+        self.repo_name = f'{self.git_org}/FreeRTOS-Kernel'
         self.repo = mGit.get_repo(self.repo_name)
-        self.tag = 'V%s' % version
+        self.tag = f'V{version}'
         self.description = 'Contains source code for the FreeRTOS Kernel.'
-        self.zip_path = 'FreeRTOS-KernelV%s.zip' % self.version
+        self.zip_path = f'FreeRTOS-KernelV{self.version}.zip'
         self.main_br_version = main_br_version
 
         # Parent ctor configures local_repo if caller chooses to source local repo from repo_path.
@@ -242,7 +239,7 @@ class KernelRelease(BaseRelease):
 
             # Clone the target repo for creating the release autocommits
             remote_name = self.getRemoteEndpoint(self.repo_name)
-            info('Downloading %s@%s to baseline auto-commits...' % (remote_name, commit), end='')
+            info(f'Downloading {remote_name}@{commit} to baseline auto-commits...', end='')
             self.local_repo = Repo.clone_from(remote_name, self.repo_path, progress=printDot, branch=self.branch)
 
         # In case user gave non-HEAD commit to baseline
@@ -251,21 +248,23 @@ class KernelRelease(BaseRelease):
         print()
 
     def updateVersionMacros(self, version_str):
-        info('Updating version macros in task.h for "%s"' % version_str)
+        info(f'Updating version macros in task.h for "{version_str}"')
 
         # Extract major / minor / build from the version string.
-        ver = re.search(r'([\d.]+)', version_str).group(1)
+        ver = re.search(r'([\d.]+)', version_str)[1]
         (major, minor, build) = ver.split('.')
         update_freertos_version_macros(os.path.join(self.repo_path, 'include', 'task.h'), version_str, major, minor, build)
 
-        self.commitChanges(self.commit_msg_prefix + 'Bump task.h version macros to "%s"' % version_str)
+        self.commitChanges(
+            f'{self.commit_msg_prefix}Bump task.h version macros to "{version_str}"'
+        )
 
     def createReleaseZip(self):
         '''
         At the moment, the only asset we upload is the source code.
         '''
-        zip_name = 'FreeRTOS-KernelV%s' % self.version
-        info('Packaging "%s"' % zip_name)
+        zip_name = f'FreeRTOS-KernelV{self.version}'
+        info(f'Packaging "{zip_name}"')
         logIndentPush()
 
         # This path name is retained in zip, so we don't name it 'tmp-*' but
@@ -277,12 +276,14 @@ class KernelRelease(BaseRelease):
             shutil.rmtree(rel_repo_path)
 
         # Download a fresh copy for packaging.
-        info('Downloading fresh copy of %s for packing...' % zip_name, end='')
-        packaged_repo = Repo.clone_from(self.getRemoteEndpoint(self.repo_name),
-                                        rel_repo_path,
-                                        multi_options=['--depth=1', '-b%s' % self.tag, '--recurse-submodules'],
-                                        progress=printDot,
-                                        branch=self.branch)
+        info(f'Downloading fresh copy of {zip_name} for packing...', end='')
+        packaged_repo = Repo.clone_from(
+            self.getRemoteEndpoint(self.repo_name),
+            rel_repo_path,
+            multi_options=['--depth=1', f'-b{self.tag}', '--recurse-submodules'],
+            progress=printDot,
+            branch=self.branch,
+        )
         print()
 
         # Prune then zip package.
@@ -290,14 +291,14 @@ class KernelRelease(BaseRelease):
         files_pruned = prune_result_tree_v2(rel_repo_path, KERNEL_RELEASE_EXCLUDE_FILES)
         print('...%d Files Removed.' % len(files_pruned))
 
-        info('Compressing "%s"...' % self.zip_path)
+        info(f'Compressing "{self.zip_path}"...')
         with zipfile.ZipFile(self.zip_path, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as zip:
             for root, dirs, files in os.walk(rel_repo_path):
                 for file in files:
                     # For some strange reason, we have broken symlinks...avoid these.
                     file_path = os.path.join(root, file)
                     if os.path.islink(file_path) and not os.path.exists(file_path):
-                        warning('Skipping over broken symlink "%s"' % file_path)
+                        warning(f'Skipping over broken symlink "{file_path}"')
                     else:
                         zip.write(file_path)
 
@@ -308,31 +309,37 @@ class KernelRelease(BaseRelease):
         Creates/Overwrites release identified by target tag
         '''
         if self.do_not_push:
-            info('Skipping creating git release endpoint for "%s"...' % self.tag)
+            info(f'Skipping creating git release endpoint for "{self.tag}"...')
         else:
             # If this release already exists, delete it
             try:
                 release_queried = self.repo.get_release(self.tag)
 
-                info('Overwriting existing git release endpoint for "%s"...' % self.tag)
+                info(f'Overwriting existing git release endpoint for "{self.tag}"...')
                 release_queried.delete_release()
             except UnknownObjectException:
-                info('Creating git release endpoint for "%s"...' % self.tag)
+                info(f'Creating git release endpoint for "{self.tag}"...')
 
             # Create the release asset to upload.
             self.createReleaseZip()
 
             # Create the new release endpoint at upload assets
-            release = self.repo.create_git_release(tag = self.tag,
-                                                name = 'V%s' % (self.version),
-                                                message = self.description,
-                                                draft = False,
-                                                prerelease = False)
+            release = self.repo.create_git_release(
+                tag=self.tag,
+                name=f'V{self.version}',
+                message=self.description,
+                draft=False,
+                prerelease=False,
+            )
             info('Uploading release asssets...')
-            release.upload_asset(self.zip_path, name='FreeRTOS-KernelV%s.zip' % self.version, content_type='application/zip')
+            release.upload_asset(
+                self.zip_path,
+                name=f'FreeRTOS-KernelV{self.version}.zip',
+                content_type='application/zip',
+            )
 
     def autoRelease(self):
-        info('Auto-releasing FreeRTOS Kernel V%s' % self.version)
+        info(f'Auto-releasing FreeRTOS Kernel V{self.version}')
 
         # Determine if we need to set a separate version macros for the main branch
         if (self.commit == 'HEAD') and len(self.main_br_version) > 0 and (self.main_br_version != self.version):
@@ -357,7 +364,10 @@ class KernelRelease(BaseRelease):
         # However in the detached HEAD state we don't have a branch to push to, so we skip
 
         # Update the header in each c/assembly file
-        self.updateFileHeaderVersions(['FreeRTOS Kernel V','FreeRTOS Kernel <DEVELOPMENT BRANCH>'], 'FreeRTOS Kernel V%s' % self.version)
+        self.updateFileHeaderVersions(
+            ['FreeRTOS Kernel V', 'FreeRTOS Kernel <DEVELOPMENT BRANCH>'],
+            f'FreeRTOS Kernel V{self.version}',
+        )
 
         self.pushTag()
 
@@ -371,11 +381,11 @@ class FreertosRelease(BaseRelease):
     def __init__(self, mGit, version, commit, git_ssh=False, git_org='FreeRTOS', repo_path=None, branch='main', do_not_push=False):
         super().__init__(mGit, version, commit, git_ssh=git_ssh, git_org=git_org, repo_path=repo_path, branch=branch, do_not_push=do_not_push)
 
-        self.repo_name = '%s/FreeRTOS' % self.git_org
+        self.repo_name = f'{self.git_org}/FreeRTOS'
         self.repo = mGit.get_repo(self.repo_name)
         self.tag = self.version
         self.description = 'Contains source code and example projects for the FreeRTOS Kernel and FreeRTOS+ libraries.'
-        self.zip_path = 'FreeRTOSv%s.zip' % self.version
+        self.zip_path = f'FreeRTOSv{self.version}.zip'
 
         # Download a fresh copy of local repo for making autocommits, if necessary
         if self.repo_path is None:
@@ -387,7 +397,7 @@ class FreertosRelease(BaseRelease):
 
             # Clone the target repo for creating the release autocommits
             remote_name = self.getRemoteEndpoint(self.repo_name)
-            info('Downloading %s@%s to baseline auto-commits...' % (remote_name, commit), end='')
+            info(f'Downloading {remote_name}@{commit} to baseline auto-commits...', end='')
             self.local_repo = Repo.clone_from(remote_name, self.repo_path, progress=printDot, branch=self.branch)
 
         # In support of non-HEAD baselines
@@ -426,14 +436,16 @@ class FreertosRelease(BaseRelease):
             self.updateSubmodulePointer(os.path.join(self.repo_path, submodule_path), submodule_tag)
         logIndentPop()
 
-        self.commitChanges(self.commit_msg_prefix + 'Bump submodules per manifest.yml for V%s' % self.version)
+        self.commitChanges(
+            f'{self.commit_msg_prefix}Bump submodules per manifest.yml for V{self.version}'
+        )
 
     def createReleaseZip(self):
         '''
         At the moment, the only asset we upload is the
         '''
-        zip_name = 'FreeRTOSv%s' % self.version
-        info('Packaging "%s"' % zip_name)
+        zip_name = f'FreeRTOSv{self.version}'
+        info(f'Packaging "{zip_name}"')
         logIndentPush()
 
         # This path name is retained in zip, so we don't name it 'tmp-*' but rather keep it consistent with previous
@@ -445,12 +457,14 @@ class FreertosRelease(BaseRelease):
             shutil.rmtree(rel_repo_path)
 
         # Download a fresh copy for packaging
-        info('Downloading fresh copy of %s for packing...' % zip_name, end='')
-        packaged_repo = Repo.clone_from(self.getRemoteEndpoint(self.repo_name),
-                                        rel_repo_path,
-                                        multi_options=['--depth=1', '-b%s' % self.tag, '--recurse-submodules'],
-                                        progress=printDot,
-                                        branch=self.branch)
+        info(f'Downloading fresh copy of {zip_name} for packing...', end='')
+        packaged_repo = Repo.clone_from(
+            self.getRemoteEndpoint(self.repo_name),
+            rel_repo_path,
+            multi_options=['--depth=1', f'-b{self.tag}', '--recurse-submodules'],
+            progress=printDot,
+            branch=self.branch,
+        )
         print()
 
         # Prune then zip package
@@ -458,14 +472,14 @@ class FreertosRelease(BaseRelease):
         files_pruned = prune_result_tree(rel_repo_path, FREERTOS_RELATIVE_FILE_EXCLUDES)
         print('...%d Files Removed.' % len(files_pruned))
 
-        info('Compressing "%s"...' % self.zip_path)
+        info(f'Compressing "{self.zip_path}"...')
         with zipfile.ZipFile(self.zip_path, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as zip:
             for root, dirs, files in os.walk(rel_repo_path):
                 for file in files:
                     # For some strange reason, we have broken symlinks...avoid these
                     file_path = os.path.join(root, file)
                     if os.path.islink(file_path) and not os.path.exists(file_path):
-                        warning('Skipping over broken symlink "%s"' % file_path)
+                        warning(f'Skipping over broken symlink "{file_path}"')
                     else:
                         zip.write(file_path)
 
@@ -476,31 +490,45 @@ class FreertosRelease(BaseRelease):
         Creates/Overwrites release identified by target tag
         '''
         if self.do_not_push:
-            info('Skipping creating git release endpoint for "%s"...' % self.tag)
+            info(f'Skipping creating git release endpoint for "{self.tag}"...')
         else:
             # If this release already exists, delete it
             try:
                 release_queried = self.repo.get_release(self.tag)
 
-                info('Overwriting existing git release endpoint for "%s"...' % self.tag)
+                info(f'Overwriting existing git release endpoint for "{self.tag}"...')
                 release_queried.delete_release()
             except UnknownObjectException:
-                info('Creating git release endpoint for "%s"...' % self.tag)
+                info(f'Creating git release endpoint for "{self.tag}"...')
 
             # Create the new release endpoind at upload assets
-            release = self.repo.create_git_release(tag = self.tag,
-                                                name = 'FreeRTOSv%s' % (self.version),
-                                                message = self.description,
-                                                draft = False,
-                                                prerelease = False)
+            release = self.repo.create_git_release(
+                tag=self.tag,
+                name=f'FreeRTOSv{self.version}',
+                message=self.description,
+                draft=False,
+                prerelease=False,
+            )
 
             info('Uploading release asssets...')
-            release.upload_asset(self.zip_path, name='FreeRTOSv%s.zip' % self.version, content_type='application/zip')
+            release.upload_asset(
+                self.zip_path,
+                name=f'FreeRTOSv{self.version}.zip',
+                content_type='application/zip',
+            )
 
     def autoRelease(self):
-        info('Auto-releasing FreeRTOS V%s' % self.version)
+        info(f'Auto-releasing FreeRTOS V{self.version}')
 
-        self.updateFileHeaderVersions(['FreeRTOS Kernel V', 'FreeRTOS V', 'FreeRTOS Kernel <DEVELOPMENT BRANCH>', 'FreeRTOS <DEVELOPMENT BRANCH>'], 'FreeRTOS V%s' % self.version)
+        self.updateFileHeaderVersions(
+            [
+                'FreeRTOS Kernel V',
+                'FreeRTOS V',
+                'FreeRTOS Kernel <DEVELOPMENT BRANCH>',
+                'FreeRTOS <DEVELOPMENT BRANCH>',
+            ],
+            f'FreeRTOS V{self.version}',
+        )
         self.updateSubmodulePointers()
         # When baselining off a non-HEAD commit, main is left unchanged by tagging a detached HEAD,
         # applying the autocommits, tagging, and pushing the new tag data to remote.

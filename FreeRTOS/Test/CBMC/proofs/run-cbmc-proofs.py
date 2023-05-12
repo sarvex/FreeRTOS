@@ -91,10 +91,7 @@ def get_args():
 
 
 def set_up_logging(verbose):
-    if verbose:
-        level = logging.DEBUG
-    else:
-        level = logging.WARNING
+    level = logging.DEBUG if verbose else logging.WARNING
     logging.basicConfig(
         format="run-cbmc-proofs: %(message)s", level=level)
 
@@ -107,17 +104,14 @@ def print_counter(counter):
 
 
 def get_proof_dirs(proof_root, proof_list):
-    if proof_list is not None:
-        proofs_remaining = list(proof_list)
-    else:
-        proofs_remaining = []
-
+    proofs_remaining = list(proof_list) if proof_list is not None else []
     for root, _, fyles in os.walk(proof_root):
-        proof_name = str(pathlib.Path(root).name)
-        if proof_list and proof_name not in proof_list:
-            continue
-        if proof_list and proof_name in proofs_remaining:
-            proofs_remaining.remove(proof_name)
+        proof_name = pathlib.Path(root).name
+        if proof_list:
+            if proof_name not in proof_list:
+                continue
+            if proof_name in proofs_remaining:
+                proofs_remaining.remove(proof_name)
         if "cbmc-batch.yaml" in fyles:
             yield pathlib.Path(root)
 
@@ -133,11 +127,11 @@ def run_cmd(cmd, **args):
         if not isinstance(cmd, str):
             raise UserWarning("Command must be a string if shell=True")
         str_cmd = cmd
-    else:
-        if not isinstance(cmd, list):
-            raise UserWarning("Command passed to run_cmd must be a list")
+    elif isinstance(cmd, list):
         str_cmd = " ".join(cmd)
 
+    else:
+        raise UserWarning("Command passed to run_cmd must be a list")
     logging.info("Command: %s", str_cmd)
 
     proc = subprocess.run(cmd, **args)
@@ -159,7 +153,7 @@ def add_proof_jobs(proof_directory, proof_root):
     proof_directory = pathlib.Path(proof_directory)
     harnesses = [
         f for f in os.listdir(proof_directory) if f.endswith("_harness.c")]
-    if not len(harnesses) == 1:
+    if len(harnesses) != 1:
         logging.error(
             "Found %d harnesses in directory '%s'", len(harnesses),
             proof_directory)
@@ -169,87 +163,155 @@ def add_proof_jobs(proof_directory, proof_root):
     # due to proof configurations. Use the relative path instead.
     proof_name = str(proof_directory.relative_to(proof_root))
 
-    goto_binary = str(
-        (proof_directory / ("%s.goto" % harnesses[0][:-2])).resolve())
+    goto_binary = str((proof_directory / f"{harnesses[0][:-2]}.goto").resolve())
 
     # Build goto-binary
 
-    run_cmd([
-        "litani", "add-job",
-        "--command", "make -B veryclean goto",
-        "--outputs", goto_binary,
-        "--pipeline-name", proof_name,
-        "--ci-stage", "build",
-        "--cwd", str(proof_directory),
-        "--description", ("%s: building goto-binary" % proof_name),
-    ], check=True)
+    run_cmd(
+        [
+            "litani",
+            "add-job",
+            "--command",
+            "make -B veryclean goto",
+            "--outputs",
+            goto_binary,
+            "--pipeline-name",
+            proof_name,
+            "--ci-stage",
+            "build",
+            "--cwd",
+            str(proof_directory),
+            "--description",
+            f"{proof_name}: building goto-binary",
+        ],
+        check=True,
+    )
 
     # Run 3 CBMC tasks
 
     cbmc_out = str(proof_directory / "cbmc.txt")
-    run_cmd([
-        "litani", "add-job",
-        "--command", "make cbmc",
-        "--inputs", goto_binary,
-        "--outputs", cbmc_out,
-        "--pipeline-name", proof_name,
-        "--ci-stage", "test",
-        "--tags", "stats-group:safety check",
-        # Make returns 2 if the underlying command exited abnormally
-        "--ignore-returns", "2",
-        "--cwd", str(proof_directory),
-        "--description", ("%s: running safety checks" % proof_name),
-    ], check=True)
+    run_cmd(
+        [
+            "litani",
+            "add-job",
+            "--command",
+            "make cbmc",
+            "--inputs",
+            goto_binary,
+            "--outputs",
+            cbmc_out,
+            "--pipeline-name",
+            proof_name,
+            "--ci-stage",
+            "test",
+            "--tags",
+            "stats-group:safety check",
+            "--ignore-returns",
+            "2",
+            "--cwd",
+            str(proof_directory),
+            "--description",
+            f"{proof_name}: running safety checks",
+        ],
+        check=True,
+    )
 
     property_out = str(proof_directory / "property.xml")
-    run_cmd([
-        "litani", "add-job",
-        "--command", "make property",
-        "--inputs", goto_binary,
-        "--outputs", property_out,
-        "--pipeline-name", proof_name,
-        "--ci-stage", "test",
-        "--cwd", str(proof_directory),
-        "--description", ("%s: printing properties" % proof_name),
-    ], check=True)
+    run_cmd(
+        [
+            "litani",
+            "add-job",
+            "--command",
+            "make property",
+            "--inputs",
+            goto_binary,
+            "--outputs",
+            property_out,
+            "--pipeline-name",
+            proof_name,
+            "--ci-stage",
+            "test",
+            "--cwd",
+            str(proof_directory),
+            "--description",
+            f"{proof_name}: printing properties",
+        ],
+        check=True,
+    )
 
     coverage_out = str(proof_directory / "coverage.xml")
-    run_cmd([
-        "litani", "add-job",
-        "--command", "make coverage",
-        "--inputs", goto_binary,
-        "--outputs", coverage_out,
-        "--pipeline-name", proof_name,
-        "--ci-stage", "test",
-        "--cwd", str(proof_directory),
-        "--tags", "stats-group:coverage computation",
-        "--description", ("%s: computing coverage" % proof_name),
-    ], check=True)
+    run_cmd(
+        [
+            "litani",
+            "add-job",
+            "--command",
+            "make coverage",
+            "--inputs",
+            goto_binary,
+            "--outputs",
+            coverage_out,
+            "--pipeline-name",
+            proof_name,
+            "--ci-stage",
+            "test",
+            "--cwd",
+            str(proof_directory),
+            "--tags",
+            "stats-group:coverage computation",
+            "--description",
+            f"{proof_name}: computing coverage",
+        ],
+        check=True,
+    )
 
     # Check whether the CBMC proof actually passed. More details in the
     # Makefile rule for check-cbmc-result.
-    run_cmd([
-        "litani", "add-job",
-        "--command", "make check-cbmc-result",
-        "--inputs", cbmc_out,
-        "--pipeline-name", proof_name,
-        "--ci-stage", "report",
-        "--cwd", str(proof_directory),
-        "--description", ("%s: checking CBMC result" % proof_name),
-    ], check=True)
+    run_cmd(
+        [
+            "litani",
+            "add-job",
+            "--command",
+            "make check-cbmc-result",
+            "--inputs",
+            cbmc_out,
+            "--pipeline-name",
+            proof_name,
+            "--ci-stage",
+            "report",
+            "--cwd",
+            str(proof_directory),
+            "--description",
+            f"{proof_name}: checking CBMC result",
+        ],
+        check=True,
+    )
 
     # Generate report
-    run_cmd([
-        "litani", "add-job",
-        "--command", "make report",
-        "--inputs", cbmc_out, property_out, coverage_out,
-        "--outputs", str(proof_directory / "html"),
-        "--pipeline-name", proof_name,
-        "--ci-stage", "report",
-        "--cwd", str(proof_directory),
-        "--tags", "stats-group:report generation",
-        "--description", ("%s: generating report" % proof_name),
-    ], check=True)
+    run_cmd(
+        [
+            "litani",
+            "add-job",
+            "--command",
+            "make report",
+            "--inputs",
+            cbmc_out,
+            property_out,
+            coverage_out,
+            "--outputs",
+            str(proof_directory / "html"),
+            "--pipeline-name",
+            proof_name,
+            "--ci-stage",
+            "report",
+            "--cwd",
+            str(proof_directory),
+            "--tags",
+            "stats-group:report generation",
+            "--description",
+            f"{proof_name}: generating report",
+        ],
+        check=True,
+    )
 
     return True
 

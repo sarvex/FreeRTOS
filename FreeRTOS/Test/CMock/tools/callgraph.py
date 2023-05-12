@@ -53,7 +53,7 @@ target_files = args.in_files
 
 for f in target_files:
     if not os.path.isfile(f):
-        print("ERROR: Input file {} does not exist.".format(f))
+        print(f"ERROR: Input file {f} does not exist.")
         sys.exit(1)
 
 includes = ""
@@ -91,15 +91,13 @@ linepattern = re.compile(lineregex)
 parent_stack = [""]
 last_indent_level = 0
 last_function_name = ""
-callmap: Dict[str, Set[str]] = {}
-callmap[""] = set()
-
+callmap: Dict[str, Set[str]] = {"": set()}
 for line in ret.stdout.decode("utf-8").splitlines():
     match = linepattern.match(line)
     # Check that the function for this line is in a target file
-    if match and (match.group("filename") in target_files):
-        indent_level = int(match.group("level"))
-        function_name = match.group("function")
+    if match and match["filename"] in target_files:
+        indent_level = int(match["level"])
+        function_name = match["function"]
 
         # Add an entry for the current function
         if function_name not in callmap:

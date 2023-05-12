@@ -34,11 +34,13 @@ def _get_max_length_per_column_list(data):
 
 
 def _get_table_header_separator(max_length_per_column_list):
-    line_sep = ""
-    for max_length_of_word_in_col in max_length_per_column_list:
-        line_sep += "|" + "-" * (max_length_of_word_in_col + 1)
-    line_sep += "|\n"
-    return line_sep
+    return (
+        "".join(
+            "|" + "-" * (max_length_of_word_in_col + 1)
+            for max_length_of_word_in_col in max_length_per_column_list
+        )
+        + "|\n"
+    )
 
 
 def _get_entries(max_length_per_column_list, row_data):
@@ -48,7 +50,7 @@ def _get_entries(max_length_per_column_list, row_data):
         for idx, word in enumerate(row):
             max_length_of_word_in_col = max_length_per_column_list[idx]
             space_formatted_word = (max_length_of_word_in_col - len(word)) * " "
-            entry += "| " + word + space_formatted_word
+            entry += f"| {word}{space_formatted_word}"
         entry += "|\n"
         entries.append(entry)
     return entries
@@ -95,8 +97,9 @@ def _get_status_and_proof_summaries(run_dict):
             continue
         proofs.append([proof_pipeline["name"], status_pretty_name])
     statuses = [["Status", "Count"]]
-    for status, count in count_statuses.items():
-        statuses.append([status, str(count)])
+    statuses.extend(
+        [status, str(count)] for status, count in count_statuses.items()
+    )
     return [statuses, proofs]
 
 
@@ -115,8 +118,7 @@ def print_proof_results(out_file):
     print(output)
     sys.stdout.flush()
 
-    github_summary_file = os.getenv("GITHUB_STEP_SUMMARY")
-    if github_summary_file:
+    if github_summary_file := os.getenv("GITHUB_STEP_SUMMARY"):
         with open(github_summary_file, "a") as handle:
             print(output, file=handle)
             handle.flush()
